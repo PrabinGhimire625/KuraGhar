@@ -1,15 +1,17 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { STATUS } from "../../globals/Status";
-import { API, APIAuthenticated } from "../../http/index";
+import { STATUS } from "../globals/Status";
+import { API, APIAuthenticated } from "../http/index";
 
 const authSlice = createSlice({
   name: "auth",
   initialState: {
     data: [],
-    userList:[],
+    userList: [],
     status: STATUS.LOADING,
-     token: localStorage.getItem("token") || "",
-    profile: ""
+    token: "",
+    profile: "",
+    searchUser:[],
+    singleUser:null
   },
   reducers: {
     setUserData(state, action) {
@@ -17,6 +19,9 @@ const authSlice = createSlice({
     },
     setUserList(state, action) {
       state.userList = action.payload;
+    },
+    setSingleUser(state, action) {
+      state.singleUser = action.payload;
     },
     setStatus(state, action) {
       state.status = action.payload;
@@ -31,6 +36,9 @@ const authSlice = createSlice({
     setProfile(state, action) {
       state.profile = action.payload;
     },
+    setSearchUser(state, action) {
+      state.searchUser = action.payload;
+    },
     setUpdateUserProfile(state, action) {
       const index = state.data.findIndex(item => item.id === action.payload.id);
       if (index !== -1) {
@@ -43,7 +51,7 @@ const authSlice = createSlice({
   },
 });
 
-export const {setUserData, setStatus, resetStatus, setToken, setProfile, setUpdateUserProfile, setUserList} = authSlice.actions;
+export const { setUserData, setStatus, resetStatus, setToken, setProfile, setUpdateUserProfile, setUserList, setSearchUser, setSingleUser } = authSlice.actions;
 export default authSlice.reducer;
 
 //signup
@@ -53,7 +61,7 @@ export function register(data) {
     try {
       const response = await API.post("/api/register", data);
       if (response.status === 200) {
-        dispatch(setUserData(response.data.data)); 
+        dispatch(setUserData(response.data.data));
         dispatch(setStatus(STATUS.SUCCESS));
       } else {
         dispatch(setStatus(STATUS.ERROR));
@@ -79,7 +87,7 @@ export function login(data) {
 
 
         localStorage.setItem('token', token);
-        localStorage.setItem('role', userData.role); 
+        localStorage.setItem('role', userData.role);
 
 
         dispatch(setStatus(STATUS.SUCCESS));
@@ -115,31 +123,30 @@ export function userProfile() {
 }
 
 //update user
-export function updateUserProfile({ id, userData }) {
+// update user
+export function updateUserProfile({ userData }) {
   return async function updateUserProfileThunk(dispatch) {
-    dispatch(setStatus(STATUS.LOADING)); 
+    dispatch(setStatus(STATUS.LOADING));
     try {
       const response = await APIAuthenticated.patch(
-        `/api/profile/update/${id}`,
+        `/api/profile/update`,
         userData,
         {
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "multipart/form-data",
           },
         }
       );
 
       if (response.status === 200) {
-        const { data } = response.data;
-        dispatch(setUpdateUserProfile({ id, data }));
-        dispatch(setStatus(STATUS.SUCCESS)); 
-      } else {
-        dispatch(setStatus(STATUS.ERROR)); 
-        throw new Error('Update failed');
+        dispatch(setProfile(response.data.data));
+        dispatch(setStatus(STATUS.SUCCESS));
+        return response.data;
       }
-    } catch (err) {
-      dispatch(setStatus(STATUS.ERROR)); 
-      throw err;
+    } catch (error) {
+      console.error("Update failed:", error);
+      dispatch(setStatus(STATUS.ERROR));
+      throw error;
     }
   };
 }
@@ -161,4 +168,44 @@ export function ListAllUser() {
       dispatch(setStatus(STATUS.ERROR));
     }
   }
+}
+
+//profile
+export function fetchSingleUser(id) {
+  return async function fetchSingleUserThunk(dispatch) {
+    dispatch(setStatus(STATUS.LOADING));
+    try {
+      const response = await API.get(`/api/singleUser/${id}`);
+      console.log("Response : ", response)
+      if (response.status === 200) {
+        dispatch(setSingleUser(response.data.data));
+        dispatch(setStatus(STATUS.SUCCESS));
+      } else {
+        dispatch(setStatus(STATUS.ERROR));
+      }
+    } catch (err) {
+      dispatch(setStatus(STATUS.ERROR));
+    }
+  }
+}
+
+
+// 
+export function searchUserDetails(query) {
+  return async function searchUserDetailsTHunk(dispatch) {
+    dispatch(setStatus(STATUS.LOADING));
+    try {
+      const response = await APIAuthenticated.get(`/api/search?q=${query}`);
+      console.log("Response on the search on the state : ", response)
+      if (response.status === 200) {
+        dispatch(setSearchUser(response.data.data));
+        dispatch(setStatus(STATUS.SUCCESS));
+      } else {
+        dispatch(setStatus(STATUS.ERROR));
+      }
+    } catch (err) {
+      console.error("Error fetching search results:", err);
+      dispatch(setStatus(STATUS.ERROR));
+    }
+  };
 }

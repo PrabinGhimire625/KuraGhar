@@ -70,30 +70,40 @@ export const profile = async (req, res) => {
 
 // update user profile
 export const updateUser = async (req, res) => {
-  const { username } = req.body;
-  const userId = req.params.id;
-  const imageFile = req.files?.image?.[0];
-  const updateData = {};
+  try {
+    const userId = req.user.id; // use authenticated user's ID
+    const { username } = req.body;
+    const imageFile = req.files?.image?.[0];
+    const updateData = {};
 
-  if (username) updateData.username = username;
+    if (username) updateData.username = username;
 
-  if (imageFile) {
-    const imageUpload = await cloudinary.uploader.upload(imageFile.path, {
-      resource_type: "image",
+    if (imageFile) {
+      const imageUpload = await cloudinary.uploader.upload(imageFile.path, {
+        resource_type: "image",
+      });
+      updateData.image = imageUpload.secure_url;
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!updatedUser)
+      return res.status(404).json({ message: "User not found" });
+
+    res.status(200).json({
+      message: "User updated successfully",
+      data: updatedUser,
     });
-    updateData.image = imageUpload.secure_url;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
-
-  const updatedUser = await User.findByIdAndUpdate(
-    userId,
-    { $set: updateData },
-    { new: true }
-  );
-
-  if (!updatedUser) return res.status(404).json({ message: "User not found" });
-
-  res.status(200).json({ message: "User updated successfully", data: updatedUser });
 };
+
 
 
 //fetch all user
@@ -128,5 +138,28 @@ export const fetchSingleUser = async (req, res) => {
       message: "Server error",
       error: err.message,
     });
+  }
+};
+
+
+//search usesrs
+export const searchUsers = async (req, res) => {
+  try {
+    const q = req.query.q || "";
+    if (!q) return res.json({ data: [] });
+
+    const regex = new RegExp(q, "i");
+
+    const users = await User.find(
+      {
+        $or: [{ username: regex }, { email: regex }],
+      },
+      "username email image role"
+    ).limit(20);
+
+    res.json({ data: users });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 };

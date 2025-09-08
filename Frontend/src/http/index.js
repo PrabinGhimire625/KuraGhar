@@ -20,7 +20,6 @@ const APIAuthenticated=axios.create({
 
 APIAuthenticated.interceptors.request.use((config)=>{
     const token= localStorage.getItem('token');
-    console.log("token in the http : ", token)
     if(token){
         config.headers.Authorization=token;
     }
